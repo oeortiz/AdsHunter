@@ -7,7 +7,23 @@ import supervision as sv
 PROJECT_NAME = "logotracker"
 VIDEO_FILE = "C:\Projects\BrandFinder\src\sesentaseg.mp4"
 
-'''
+#def __init__(self, name ='', times = 1, h=1, w=1):
+class Prediction (object):
+    predictionList = {}
+    def __init__(self, name, times=0, h=1,w=1):
+        self.name = name
+        self.times = times
+        self.h = h
+        self.w = w
+        Prediction.predictionList[name] = self
+
+    def __str__(self):
+        return self.name +" ["+self.times+"]"
+    
+    def get_sreen_percentage(self):
+        return self.h * self.w
+
+
 #matplotlib.pyplot.ioff()
 # Initialize the Roboflow object with your API key
 rf = Roboflow(api_key="GShvoXqnCrQbVtWOrVcs")
@@ -25,22 +41,19 @@ job_id, signed_url, expire_time = model.predict_video(
     prediction_type="batch-video",
 )
 
-results = model.poll_until_video_results(job_id)
+results = model.poll_until_video_results(job_id)          
 
 with open("results.json", "w") as f:
     json.dump(results, f)
     #print(f)
-'''
-
-with open('results.json', 'r') as archivo:
-    results = json.load(archivo)    
 
 frame_offset = results["frame_offset"]
 model_results = results[PROJECT_NAME]
 
+
 def callback(scene: np.ndarray, index: int) -> np.ndarray:
 
-    
+   # poll_until_video_results
 
     if index in frame_offset:
         detections = sv.Detections.from_inference(
@@ -80,9 +93,73 @@ def callback(scene: np.ndarray, index: int) -> np.ndarray:
 
     return annotated_image
 
+def writeReport():
 
+    os.chdir('C:\Projects\AdsHunter')
+    print("Trabajando en el entorno ->" + os.getcwd())
+
+    with open('results.json', 'r') as archivo:
+        results = json.load(archivo)
+        
+    frame_offset = results["frame_offset"]
+    model_results = results[PROJECT_NAME]
+
+    # import xlsxwriter module
+    import xlsxwriter
+    
+    workbook = xlsxwriter.Workbook('Report.xlsx')
+    worksheet = workbook.add_worksheet()
+    
+    # Start from the first cell.
+    # Rows and columns are zero indexed.
+    row = 0
+    column = 0
+    classesTimes  = []
+    # iterating through content list
+    # result = list(filter(lambda x: (x % 13 == 0), my_list))
+
+    validPredictions = list(filter(lambda x: ( len(x['predictions']) > 0 ), model_results))   
+
+    worksheet.write(row, column, 'Tiempo')
+    worksheet.write(row, column + 1, 'Width')
+    worksheet.write(row, column + 2, 'Height')
+    worksheet.write(row, column + 3, 'Class')
+    worksheet.write(row, column + 4, '# Impresión')
+    row += 1
+
+    for predictionParent in validPredictions :                 
+        column = 0
+        worksheet.write(row, column, predictionParent['time'])
+        row += 1
+        for prediction in predictionParent['predictions']:
+            # write operation perform
+            
+            worksheet.write(row, column + 1, prediction['width'])
+            worksheet.write(row, column + 2, prediction['height'])
+            worksheet.write(row, column + 3, prediction['class'])
+
+            if( prediction['class'] not in Prediction.predictionList ):
+                Prediction(prediction['class'])
+            pred = Prediction.predictionList[prediction['class']]
+            pred.times +=1
+            worksheet.write(row, column + 4, pred.times)
+            worksheet.write(row, column + 5, prediction['class_id'])
+
+            row += 1
+            # incrementing the value of row by one
+            # with each iterations.
+    row += 1
+        
+    workbook.close()
+    print ("Reporte Creado Exitosamente")
+
+""" 
 sv.process_video(
     source_path=VIDEO_FILE,
     target_path="output.mp4",
     callback=callback,
 )
+"""
+
+#Create Report
+writeReport()
